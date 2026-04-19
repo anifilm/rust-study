@@ -1,0 +1,179 @@
+import { Button, HorizontalBox, VerticalBox } from "std-widgets.slint";
+
+export struct CellData {
+    is-mine: bool,
+    is-revealed: bool,
+    is-flagged: bool,
+    adjacent-mines: int,
+}
+
+component CellItem {
+    in property <CellData> cell-data;
+    in property <int> index;
+
+    callback left-clicked(int);
+    callback right-clicked(int);
+
+    width: 36px;
+    height: 36px;
+
+    property <bool> revealed: cell-data.is-revealed;
+
+    pure function number-color(n: int) -> color {
+        if (n == 1) { return #0000ff; }
+        if (n == 2) { return #008000; }
+        if (n == 3) { return #ff0000; }
+        if (n == 4) { return #000080; }
+        if (n == 5) { return #800000; }
+        if (n == 6) { return #008080; }
+        if (n == 7) { return #000000; }
+        return #808080;
+    }
+
+    Rectangle {
+        width: parent.width;
+        height: parent.height;
+        background: revealed
+            ? (cell-data.is-mine ? #ff6666 : #c0c0c0)
+            : #c0c0c0;
+        border-width: revealed ? 1px : 0px;
+        border-color: #999999;
+
+        // Top highlight (unrevealed 3D effect)
+        Rectangle {
+            visible: !revealed;
+            x: 0px; y: 0px;
+            width: parent.width; height: 2px;
+            background: #ffffff;
+        }
+        Rectangle {
+            visible: !revealed;
+            x: 0px; y: 0px;
+            width: 2px; height: parent.height;
+            background: #ffffff;
+        }
+        // Bottom shadow (unrevealed 3D effect)
+        Rectangle {
+            visible: !revealed;
+            x: 0px; y: parent.height - 2px;
+            width: parent.width; height: 2px;
+            background: #808080;
+        }
+        Rectangle {
+            visible: !revealed;
+            x: parent.width - 2px; y: 0px;
+            width: 2px; height: parent.height;
+            background: #808080;
+        }
+
+        // Number
+        Text {
+            visible: revealed && !cell-data.is-mine && cell-data.adjacent-mines > 0;
+            text: cell-data.adjacent-mines;
+            font-size: 16px;
+            font-weight: 700;
+            color: number-color(cell-data.adjacent-mines);
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            width: parent.width;
+            height: parent.height;
+        }
+        // Mine
+        Text {
+            visible: revealed && cell-data.is-mine;
+            text: "💣";
+            font-size: 18px;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            width: parent.width;
+            height: parent.height;
+        }
+        // Flag
+        Text {
+            visible: !revealed && cell-data.is-flagged;
+            text: "🚩";
+            font-size: 18px;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            width: parent.width;
+            height: parent.height;
+        }
+
+        TouchArea {
+            pointer-event(event) => {
+                if (event.button == PointerEventButton.left && event.kind == PointerEventKind.up) {
+                    left-clicked(index);
+                }
+                if (event.button == PointerEventButton.right && event.kind == PointerEventKind.down) {
+                    right-clicked(index);
+                }
+            }
+        }
+    }
+}
+
+export component AppWindow inherits Window {
+    title: "Minesweeper";
+    width: 9 * 36px + 24px;
+    height: 9 * 36px + 80px;
+    background: #c0c0c0;
+
+    in-out property <[CellData]> cells;
+    in-out property <int> mines-remaining: 10;
+    in-out property <string> status-text: "playing";
+
+    callback cell-left-clicked(int);
+    callback cell-right-clicked(int);
+    callback reset-game();
+
+    VerticalBox {
+        padding: 12px;
+        spacing: 8px;
+
+        // Header
+        HorizontalBox {
+            alignment: space-between;
+            padding: 0px;
+
+            Text {
+                text: "💣 " + mines-remaining;
+                font-size: 20px;
+                font-weight: 700;
+                color: #000000;
+                vertical-alignment: center;
+            }
+
+            Button {
+                text: status-text == "lost" ? "😵" : (status-text == "won" ? "😎" : "😊");
+                clicked => { reset-game(); }
+            }
+        }
+
+        // Board
+        Rectangle {
+            width: 9 * 36px;
+            height: 9 * 36px;
+            background: #c0c0c0;
+            border-width: 2px;
+            border-color: #808080;
+
+            VerticalLayout {
+                padding: 0px;
+                spacing: 0px;
+
+                for row-idx in 9: HorizontalLayout {
+                    padding: 0px;
+                    spacing: 0px;
+                    height: 36px;
+
+                    for col-idx in 9: CellItem {
+                        cell-data: cells[row-idx * 9 + col-idx];
+                        index: row-idx * 9 + col-idx;
+                        left-clicked(idx) => { cell-left-clicked(idx); }
+                        right-clicked(idx) => { cell-right-clicked(idx); }
+                    }
+                }
+            }
+        }
+    }
+}
