@@ -1,0 +1,9 @@
+[package]
+name = "maze-runner-bevy"
+version = "0.1.0"
+edition = "2021"
+description = "A maze escape game built with Bevy engine"
+
+[dependencies]
+bevy = "0.15"
+rand = "0.8"
