@@ -1,0 +1,15 @@
+[package]
+name = "chess-bevy"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bevy = "0.19"
+
+# Bevy 자체는 디버그 빌드에서 매우 느리므로, 의존성은 최적화하여
+# 개발 중에도 쾌적한 실행 속도를 확보한다.
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3

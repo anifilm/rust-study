@@ -1,0 +1,9 @@
+[package]
+name = "othello-bevy"
+version = "0.1.0"
+edition = "2021"
+description = "An Othello (Reversi) game built with Bevy engine"
+
+[dependencies]
+bevy = "0.15"
+rand = "0.8"
