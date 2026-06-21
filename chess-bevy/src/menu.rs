@@ -1,4 +1,4 @@
-//! 시작 메뉴와 "준비 중"(AI 대전) 화면.
+//! 시작 메뉴와 AI 대전 난이도 선택 화면.
 
 use bevy::prelude::*;
 
@@ -13,9 +13,9 @@ const PRESSED: Color = Color::srgb(0.32, 0.52, 0.34);
 #[derive(Component)]
 struct OnMenuScreen;
 
-/// "준비 중" 화면 엔티티 마커.
+/// AI 난이도 선택 화면 엔티티 마커.
 #[derive(Component)]
-struct OnComingSoonScreen;
+struct OnAiSetupScreen;
 
 /// 메뉴 버튼의 동작.
 #[derive(Component, Clone, Copy)]
@@ -24,10 +24,6 @@ enum MenuButton {
     VersusAi,
     Quit,
 }
-
-/// 준비 중 화면의 "메뉴로" 버튼.
-#[derive(Component)]
-struct BackToMenu;
 
 pub struct MenuPlugin;
 
@@ -39,14 +35,11 @@ impl Plugin for MenuPlugin {
                 Update,
                 menu_buttons.run_if(in_state(AppState::Menu)),
             )
-            .add_systems(OnEnter(AppState::ComingSoon), setup_coming_soon)
-            .add_systems(
-                OnExit(AppState::ComingSoon),
-                despawn::<OnComingSoonScreen>,
-            )
+            .add_systems(OnEnter(AppState::AiSetup), setup_ai_setup)
+            .add_systems(OnExit(AppState::AiSetup), despawn::<OnAiSetupScreen>)
             .add_systems(
                 Update,
-                coming_soon_buttons.run_if(in_state(AppState::ComingSoon)),
+                ai_setup_buttons.run_if(in_state(AppState::AiSetup)),
             );
     }
 }
@@ -131,7 +124,7 @@ fn menu_buttons(
                         commands.insert_resource(GameMode::LocalVersus);
                         next_state.set(AppState::InGame);
                     }
-                    MenuButton::VersusAi => next_state.set(AppState::ComingSoon),
+                    MenuButton::VersusAi => next_state.set(AppState::AiSetup),
                     MenuButton::Quit => {
                         exit.write(AppExit::Success);
                     }
@@ -143,7 +136,16 @@ fn menu_buttons(
     }
 }
 
-fn setup_coming_soon(mut commands: Commands, font: Res<GameFont>) {
+/// AI 난이도 버튼.
+#[derive(Component, Clone, Copy)]
+enum AiDifficultyButton {
+    Easy,
+    Medium,
+    Hard,
+    Back,
+}
+
+fn setup_ai_setup(mut commands: Commands, font: Res<GameFont>) {
     commands.spawn((
         Node {
             width: percent(100),
@@ -151,10 +153,10 @@ fn setup_coming_soon(mut commands: Commands, font: Res<GameFont>) {
             flex_direction: FlexDirection::Column,
             align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,
-            row_gap: px(20),
+            row_gap: px(16),
             ..default()
         },
-        OnComingSoonScreen,
+        OnAiSetupScreen,
         children![
             (
                 Text::new("AI 대전"),
@@ -162,21 +164,24 @@ fn setup_coming_soon(mut commands: Commands, font: Res<GameFont>) {
                 TextColor(Color::srgb(0.95, 0.95, 0.95)),
             ),
             (
-                Text::new("AI 대전 모드는 준비 중입니다.\n먼저 1:1 대전을 즐겨보세요!"),
-                text_font(&font, 22.0),
-                TextColor(Color::srgb(0.75, 0.75, 0.8)),
-                TextLayout::justify(Justify::Center),
+                Text::new("난이도를 선택하세요 (플레이어: 백 / AI: 흑)"),
+                text_font(&font, 20.0),
+                TextColor(Color::srgb(0.7, 0.7, 0.75)),
                 Node {
-                    margin: UiRect::bottom(px(16)),
+                    margin: UiRect::bottom(px(12)),
                     ..default()
                 },
             ),
+            ai_difficulty_button(&font, AiDifficultyButton::Easy, "쉬움"),
+            ai_difficulty_button(&font, AiDifficultyButton::Medium, "보통"),
+            ai_difficulty_button(&font, AiDifficultyButton::Hard, "어려움"),
             (
                 Button,
-                BackToMenu,
+                AiDifficultyButton::Back,
                 Node {
-                    width: px(240),
+                    width: px(280),
                     height: px(58),
+                    margin: UiRect::top(px(8)),
                     border: UiRect::all(px(2)),
                     align_items: AlignItems::Center,
                     justify_content: JustifyContent::Center,
@@ -187,7 +192,7 @@ fn setup_coming_soon(mut commands: Commands, font: Res<GameFont>) {
                 BackgroundColor(NORMAL),
                 children![(
                     Text::new("← 메뉴로"),
-                    text_font(&font, 26.0),
+                    text_font(&font, 24.0),
                     TextColor(Color::srgb(0.92, 0.92, 0.92)),
                 )],
             ),
@@ -195,18 +200,56 @@ fn setup_coming_soon(mut commands: Commands, font: Res<GameFont>) {
     ));
 }
 
-fn coming_soon_buttons(
+fn ai_difficulty_button(font: &GameFont, action: AiDifficultyButton, label: &str) -> impl Bundle {
+    (
+        Button,
+        action,
+        Node {
+            width: px(280),
+            height: px(58),
+            border: UiRect::all(px(2)),
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            border_radius: BorderRadius::all(px(10)),
+            ..default()
+        },
+        BorderColor::all(Color::srgb(0.45, 0.45, 0.5)),
+        BackgroundColor(NORMAL),
+        children![(
+            Text::new(label),
+            text_font(font, 26.0),
+            TextColor(Color::srgb(0.92, 0.92, 0.92)),
+        )],
+    )
+}
+
+fn ai_setup_buttons(
     mut interactions: Query<
-        (&Interaction, &mut BackgroundColor),
-        (Changed<Interaction>, With<BackToMenu>),
+        (&Interaction, &AiDifficultyButton, &mut BackgroundColor),
+        Changed<Interaction>,
     >,
     mut next_state: ResMut<NextState<AppState>>,
+    mut commands: Commands,
 ) {
-    for (interaction, mut color) in &mut interactions {
+    for (interaction, button, mut color) in &mut interactions {
         match interaction {
             Interaction::Pressed => {
                 *color = PRESSED.into();
-                next_state.set(AppState::Menu);
+                match button {
+                    AiDifficultyButton::Easy => {
+                        commands.insert_resource(GameMode::AiVersus { search_depth: 2 });
+                        next_state.set(AppState::InGame);
+                    }
+                    AiDifficultyButton::Medium => {
+                        commands.insert_resource(GameMode::AiVersus { search_depth: 3 });
+                        next_state.set(AppState::InGame);
+                    }
+                    AiDifficultyButton::Hard => {
+                        commands.insert_resource(GameMode::AiVersus { search_depth: 4 });
+                        next_state.set(AppState::InGame);
+                    }
+                    AiDifficultyButton::Back => next_state.set(AppState::Menu),
+                }
             }
             Interaction::Hovered => *color = HOVERED.into(),
             Interaction::None => *color = NORMAL.into(),

@@ -1,7 +1,6 @@
 //! Bevy 0.19 로 만든 체스 게임.
 //!
-//! 시작 메뉴에서 "1:1 대전 / AI 대전 / 나가기" 를 선택할 수 있으며,
-//! 현재는 1:1 대전(로컬 2인)이 완전히 구현되어 있다.
+//! 시작 메뉴에서 "1:1 대전 / AI 대전 / 나가기" 를 선택할 수 있다.
 
 mod chess;
 mod menu;
@@ -17,8 +16,8 @@ pub enum AppState {
     #[default]
     Menu,
     InGame,
-    /// 아직 구현되지 않은 AI 대전 안내 화면.
-    ComingSoon,
+    /// AI 대전 난이도 선택 화면.
+    AiSetup,
 }
 
 /// 한글을 렌더링하기 위한 공용 폰트 핸들.
@@ -31,7 +30,8 @@ fn main() {
     app.add_plugins(DefaultPlugins.set(WindowPlugin {
         primary_window: Some(Window {
             title: "체스 - Bevy".into(),
-            resolution: (760u32, 760u32).into(),
+            resolution: (1060u32, 760u32).into(),
+            resizable: false,
             ..default()
         }),
         ..default()
@@ -53,7 +53,11 @@ fn main() {
         .run();
 }
 
-/// 2D 카메라를 준비한다.
+/// 2D 카메라를 준비한다. 카메라를 오른쪽으로 옮겨, 보드는 화면 왼쪽에
+/// 두고 오른편에 이동 기록 패널 공간을 확보한다.
 fn setup(mut commands: Commands) {
-    commands.spawn(Camera2d);
+    commands.spawn((
+        Camera2d,
+        Transform::from_xyz(chess::CAMERA_X, 0.0, 0.0),
+    ));
 }

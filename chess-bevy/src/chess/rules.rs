@@ -27,6 +27,22 @@ impl Color {
             Color::Black => "흑(Black)",
         }
     }
+
+    /// 에셋 배열 인덱스(White=0, Black=1).
+    pub fn index(self) -> usize {
+        match self {
+            Color::White => 0,
+            Color::Black => 1,
+        }
+    }
+
+    /// 이미지 파일명 접두사.
+    pub fn prefix(self) -> char {
+        match self {
+            Color::White => 'w',
+            Color::Black => 'b',
+        }
+    }
 }
 
 /// 기물 종류.
@@ -41,7 +57,7 @@ pub enum Kind {
 }
 
 impl Kind {
-    /// 기물 위에 그릴 글자.
+    /// 이미지 파일명에 쓰는 종류 문자(예: `wK` 의 `K`).
     pub fn letter(self) -> &'static str {
         match self {
             Kind::Pawn => "P",
@@ -50,6 +66,18 @@ impl Kind {
             Kind::Rook => "R",
             Kind::Queen => "Q",
             Kind::King => "K",
+        }
+    }
+
+    /// 에셋 배열 인덱스.
+    pub fn index(self) -> usize {
+        match self {
+            Kind::Pawn => 0,
+            Kind::Knight => 1,
+            Kind::Bishop => 2,
+            Kind::Rook => 3,
+            Kind::Queen => 4,
+            Kind::King => 5,
         }
     }
 }
@@ -131,6 +159,94 @@ pub enum Status {
     Check,
     Checkmate { winner: Color },
     Stalemate,
+}
+
+/// 칸 이름(예: `e4`).
+pub fn square_name(sq: Square) -> String {
+    format!(
+        "{}{}",
+        (b'a' + sq.file as u8) as char,
+        (b'1' + sq.rank as u8) as char
+    )
+}
+
+/// 한 수를 (간이) 대수기보(SAN)로 변환한다.
+/// 디스앰비규에이션(같은 종류 기물 중복 이동)까지 처리하지만, 체크/메이트
+/// 접미사(`+`/`#`)는 수를 둔 뒤 상태를 알아야 하므로 호출자가 덧붙인다.
+pub fn move_to_san(squares: &Squares, en_passant: Option<Square>, mv: ChessMove) -> String {
+    let piece = match piece_at(squares, mv.from) {
+        Some(p) => p,
+        None => return String::new(),
+    };
+
+    if mv.flag == MoveFlag::Castle {
+        return if mv.to.file == 6 {
+            "O-O".to_string()
+        } else {
+            "O-O-O".to_string()
+        };
+    }
+
+    let is_capture = piece_at(squares, mv.to).is_some() || mv.flag == MoveFlag::EnPassant;
+    let dest = square_name(mv.to);
+    let from_file = (b'a' + mv.from.file as u8) as char;
+    let from_rank = (b'1' + mv.from.rank as u8) as char;
+
+    if piece.kind == Kind::Pawn {
+        let mut s = String::new();
+        if is_capture {
+            s.push(from_file);
+            s.push('x');
+        }
+        s.push_str(&dest);
+        if mv.flag == MoveFlag::Promotion {
+            s.push_str("=Q");
+        }
+        return s;
+    }
+
+    let mut s = String::from(piece.kind.letter());
+
+    // 같은 색·같은 종류의 다른 기물도 같은 칸으로 갈 수 있으면 출발 정보를 덧붙인다.
+    let mut ambiguous = false;
+    let mut same_file = false;
+    let mut same_rank = false;
+    for rank in 0..8 {
+        for file in 0..8 {
+            let other = Square::new(file, rank);
+            if other == mv.from {
+                continue;
+            }
+            if let Some(p2) = squares[other.index()] {
+                if p2.color == piece.color
+                    && p2.kind == piece.kind
+                    && legal_moves_from(squares, en_passant, other)
+                        .iter()
+                        .any(|m| m.to == mv.to)
+                {
+                    ambiguous = true;
+                    same_file |= other.file == mv.from.file;
+                    same_rank |= other.rank == mv.from.rank;
+                }
+            }
+        }
+    }
+    if ambiguous {
+        if !same_file {
+            s.push(from_file);
+        } else if !same_rank {
+            s.push(from_rank);
+        } else {
+            s.push(from_file);
+            s.push(from_rank);
+        }
+    }
+
+    if is_capture {
+        s.push('x');
+    }
+    s.push_str(&dest);
+    s
 }
 
 /// 표준 체스 시작 배치를 생성한다.
